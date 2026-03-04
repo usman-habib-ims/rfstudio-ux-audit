@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import VideoBackground from "./VideoBackground";
 
 const Hero = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -10,9 +11,20 @@ const Hero = () => {
   }, []);
 
   const styles = {
+    wrapper: {
+      position: "relative",
+      overflow: "hidden",
+      minHeight: "100vh",
+      width: "100%",
+    },
+    overlay: {
+      position: "absolute",
+      inset: 0,
+      background: "rgba(0,0,0,0.65)",
+      zIndex: 1,
+    },
     section: {
       minHeight: "100vh",
-      background: "radial-gradient(circle at 50% 50%, #1a0b2e 0%, #120422 100%)",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -20,8 +32,8 @@ const Hero = () => {
       textAlign: "center",
       padding: "100px 20px 40px",
       color: "white",
-      overflow: "hidden",
       position: "relative",
+      zIndex: 2,
     },
     label: {
       display: "inline-block",
@@ -127,60 +139,44 @@ const Hero = () => {
   };
 
   return (
-    <section style={styles.section}>
-      <div style={styles.label}>Growth Intelligence Agency</div>
-      <h1 style={styles.headline}>
-        We Turn Insights Into <span style={styles.highlight}>Revenue</span>
-      </h1>
-      <p style={styles.subtitle}>
-        We build your unfair advantage — a living system that learns faster, 
-        experiments smarter, and compounds growth quarter after quarter.
-      </p>
-      
-      <div style={styles.buttonContainer}>
-        <a 
-          href="#" 
-          style={styles.primaryBtn}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = "transparent";
-            e.target.style.color = "#c8ff00";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = "#c8ff00";
-            e.target.style.color = "black";
-          }}
-        >
-          Get Started
-        </a>
-        <a 
-          href="#" 
-          style={styles.secondaryBtn}
-          onMouseEnter={(e) => {
-            e.target.style.borderColor = "white";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.borderColor = "rgba(255, 255, 255, 0.2)";
-          }}
-        >
-          See Our Work
-        </a>
-      </div>
+    <div style={styles.wrapper}>
+      <VideoBackground
+        src="/videos/hero-bg.mp4"
+        poster="/images/hero-poster.webp"
+        fallbackImage="/images/hero-fallback.jpg"
+      />
+      <div style={styles.overlay}></div>
+      <section style={styles.section}>
+        <div style={styles.label}>Growth Intelligence Agency</div>
+        <h1 style={styles.headline}>
+          We Turn Insights Into <span style={styles.highlight}>Revenue</span>
+        </h1>
+        <p style={styles.subtitle}>
+          We build your unfair advantage — a living system that learns faster, 
+          experiments smarter, and compounds growth quarter after quarter.
+        </p>
+        
+        <div style={styles.buttonContainer}>
+          <a href="#" style={styles.primaryBtn}>Get Started</a>
+          <a href="#" style={styles.secondaryBtn}>See Our Work</a>
+        </div>
 
-      <div style={styles.statsContainer}>
-        <div style={styles.statBox}>
-          <span style={styles.statValue}>120+</span>
-          <span style={styles.statLabel}>Clients Served</span>
+        <div style={styles.statsContainer}>
+          <div style={styles.statBox}>
+            <span style={styles.statValue}>120+</span>
+            <span style={styles.statLabel}>Clients Served</span>
+          </div>
+          <div style={styles.statBox}>
+            <span style={styles.statValue}>3.4x</span>
+            <span style={styles.statLabel}>Average ROI</span>
+          </div>
+          <div style={styles.statBox}>
+            <span style={styles.statValue}>98%</span>
+            <span style={styles.statLabel}>Retention Rate</span>
+          </div>
         </div>
-        <div style={styles.statBox}>
-          <span style={styles.statValue}>3.4x</span>
-          <span style={styles.statLabel}>Average ROI</span>
-        </div>
-        <div style={styles.statBox}>
-          <span style={styles.statValue}>98%</span>
-          <span style={styles.statLabel}>Retention Rate</span>
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 };
 
