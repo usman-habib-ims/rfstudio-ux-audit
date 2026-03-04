@@ -552,3 +552,287 @@ public/
 | Mobile video download | Always | Never |
 | Reduced motion support | None | Full |
 | Screen reader noise | Video announced | aria-hidden skips it |
+
+
+## Issue 4 — Contact Form Has No Field Labels (High)
+
+### What the Problem Is
+The homepage contact form uses placeholder text as the sole field identifier
+with zero `<label>` elements anywhere in the form markup. The moment a user
+clicks into any field the placeholder text vanishes — leaving a completely
+blank input with no indication of what information is required.
+
+This creates two separate problems at once:
+
+1. **Usability failure** — Regular users who click into a field and get
+   distracted lose all context. They have no idea what they were filling in.
+   This is especially bad on mobile where users switch apps frequently.
+
+2. **Accessibility failure** — Screen readers announce form fields by reading
+   their associated label. With no `<label>` elements, a screen reader user
+   hears "blank edit field" with zero context about what to type. The form
+   is functionally unusable for anyone relying on assistive technology.
+
+The contact form is the **primary conversion point** on the entire homepage.
+Friction here directly costs the business leads and revenue.
+
+---
+
+### Where It Shows Up
+- Homepage contact form — "Let's Build Something Powerful" section
+- Every single input field in the form
+- Affects all users but critically breaks the experience for screen reader
+  users and anyone with cognitive disabilities
+
+---
+
+### Why It Matters for Revenue
+The contact form is not a secondary feature — it is the entire point of the
+homepage. Every visitor who bounces from this form without submitting is a
+lost lead. Specific impacts:
+
+- **Lost conversions** — users forget what field they were filling in
+- **Lost leads from assistive tech users** — form is unusable without labels
+- **Legal risk** — WCAG AA compliance is a legal requirement in many
+  jurisdictions including the US (ADA), UK (PSBAR), and EU (EN 301 549)
+- **Failed audits** — any enterprise client running an accessibility audit
+  will flag this immediately, damaging RF Studio's professional credibility
+
+---
+
+### WCAG Violations
+
+| Criterion | Level | Description | Status |
+|-----------|-------|-------------|--------|
+| 1.3.1 Info and Relationships | A | Form labels must be programmatically associated | ❌ Fails |
+| 3.3.2 Labels or Instructions | AA | Inputs collecting user data must have labels | ❌ Fails |
+| 4.1.2 Name, Role, Value | A | UI components must have accessible names | ❌ Fails |
+
+---
+
+### Root Cause (Code Level)
+```html
+<!-- ❌ What the site does — placeholder only, no label -->
+<input type="email" placeholder="What's Your Email? *" />
+<input type="tel"   placeholder="What's Your Phone Number?" />
+```
+
+**Why this fails:**
+- Placeholder disappears on focus — user loses context
+- No programmatic association between field and its purpose
+- Screen reader announces "edit text" with no name
+- `placeholder` attribute is NOT a substitute for `<label>` per WCAG
+
+---
+
+### The Fix
+
+Add a proper visible `<label>` element linked to every input via `for`/`id`.
+Keep placeholders as secondary hints only. Add ARIA attributes for full
+screen reader support. Add inline validation with error states.
+```html
+<!-- ✅ The fix — proper label, always visible, screen reader friendly -->
+<label for="email">
+  Email Address <span aria-hidden="true">*</span>
+</label>
+<input
+  id="email"
+  name="email"
+  type="email"
+  placeholder="you@company.com"
+  aria-required="true"
+  aria-describedby="email-hint"
+  aria-invalid="false"
+/>
+<span id="email-hint">
+  We'll reply to this address within 24 hours
+</span>
+```
+
+**Why this works:**
+- Label is always visible — before, during, and after typing
+- `for="email"` links the label to the input — clicking label focuses input
+- `aria-required="true"` — screen reader announces "required"
+- `aria-describedby="email-hint"` — screen reader reads the hint after the label
+- `aria-invalid` — toggled to `"true"` when validation fails
+- `<span aria-hidden="true">*</span>` — asterisk visible but not read aloud
+
+---
+
+### Files Created / Modified
+
+| File | What Changed |
+|------|-------------|
+| `src/components/ContactForm.jsx` | Created — fully accessible form with labels, validation, success state |
+| `src/app/page.jsx` | Updated — contact section added below Hero with two-column layout |
+| `src/app/globals.css` | Updated — responsive grid media queries added at bottom |
+
+---
+
+### How ContactForm.jsx Works
+```
+ContactForm state:
+├── values        → { name, email, phone, company, message }
+├── errors        → { name, email, phone, message }
+├── focused       → which field is currently focused
+├── isLoading     → true while "submitting"
+└── isSuccess     → true after valid submission
+
+On submit:
+├── Validate all required fields
+├── If errors:
+│   ├── Set error state per field
+│   ├── Apply red border + glow to invalid fields
+│   ├── Show error message in hint span
+│   └── Focus first invalid field automatically
+└── If valid:
+    ├── Set isLoading = true (shows "Sending...")
+    ├── Simulate 1.5s network delay
+    └── Set isSuccess = true (shows confirmation message)
+
+Field focus behavior:
+├── Border: rgba(255,255,255,0.1) → #c8ff00
+└── Glow: box-shadow 0 0 0 3px rgba(200,255,0,0.12)
+```
+
+---
+
+### Validation Rules
+
+| Field | Required | Rule | Error Message |
+|-------|----------|------|---------------|
+| Full Name | ✅ Yes | Min 2 characters | "Please enter your full name" |
+| Email | ✅ Yes | Valid email format | "Please enter a valid email address" |
+| Phone | ❌ No | If filled: min 7 chars | "Please enter a valid phone number" |
+| Company | ❌ No | None | — |
+| Message | ✅ Yes | Min 20 characters | "Please tell us a bit more (min 20 characters)" |
+
+---
+
+### Accessibility Implementation Detail
+```jsx
+// ✅ Label always visible — never disappears
+<label htmlFor="email" style={{ display: "block", fontSize: "13px" }}>
+  Email Address{" "}
+  <span aria-hidden="true" style={{ color: "#c8ff00" }}>*</span>
+</label>
+
+// ✅ Input with full ARIA support
+<input
+  id="email"
+  name="email"
+  type="email"
+  aria-required="true"
+  aria-describedby="email-hint"
+  aria-invalid={errors.email ? "true" : "false"}
+  placeholder="you@company.com"
+/>
+
+// ✅ Hint switches to error message when invalid
+<span
+  id="email-hint"
+  style={{ color: errors.email ? "#ff4444" : "#666" }}
+>
+  {errors.email || "We'll reply to this address within 24 hours"}
+</span>
+
+// ✅ First invalid field gets focused automatically
+const firstErrorRef = useRef(null);
+// ... after validation:
+firstErrorRef.current?.focus();
+```
+
+---
+
+### Form States
+
+**Default state** — all labels visible, hints in grey below each field
+
+**Focus state** — lime green border `#c8ff00` + subtle glow on active field
+
+**Error state** — red border `#ff4444` + red glow + error message replaces hint
+
+**Loading state** — button shows "Sending..." and is disabled at opacity 0.6
+
+**Success state:**
+```
+     ✓
+  Message Sent!
+  We'll be in touch within 24 hours.
+  [ Send Another ]
+```
+
+---
+
+### Technical Details
+
+| Property | Before | After |
+|----------|--------|-------|
+| `<label>` elements | None | ✅ Every field has one |
+| Label visibility | N/A | ✅ Always visible |
+| `aria-required` | Missing | ✅ On all required fields |
+| `aria-describedby` | Missing | ✅ Links to hint/error span |
+| `aria-invalid` | Missing | ✅ Toggled on validation fail |
+| Error feedback | None | ✅ Per-field inline errors |
+| First error focused | No | ✅ Auto-focus on submit |
+| Loading state | None | ✅ "Sending..." + disabled |
+| Success confirmation | None | ✅ Full success message |
+| WCAG 1.3.1 | ❌ Fails | ✅ Passes |
+| WCAG 3.3.2 | ❌ Fails | ✅ Passes |
+| WCAG 4.1.2 | ❌ Fails | ✅ Passes |
+
+---
+
+### Contact Section Layout (page.jsx)
+```
+Contact Section (two columns on desktop)
+├── Left column
+│   ├── Badge: "Start a Project"
+│   ├── Heading: "Your vision, expertly executed"
+│   ├── Subtext paragraph
+│   └── Three bullet points with ✦ lime bullets:
+│       ✦ Amplify your digital footprint
+│       ✦ Turn visitors into customers
+│       └── Project structures for your ambitions
+└── Right column
+    └── <ContactForm />
+
+On mobile: stacks to single column, left above right
+```
+
+---
+
+### AI Prompt Used
+
+> "I am building a Next.js 14 app (App Router, no TypeScript).
+> Fix a High severity accessibility issue — the contact form has no
+> field labels, only placeholders. Create src/components/ContactForm.jsx
+> as a client component. Every field needs a visible label with htmlFor,
+> aria-required, aria-describedby linking to a hint span, aria-invalid
+> on errors. Fields: Full Name, Email, Phone, Company, Message.
+> Validation on submit — focus first invalid field. Loading state on
+> submit button. Success state after valid submission. Lime green focus
+> glow. Update page.jsx with two-column contact section. Add responsive
+> media queries to globals.css."
+
+### Iterations Taken
+- **Iteration 1:** Generated the form — labels worked but `aria-invalid`
+  was not being toggled on submit, it was hardcoded to `"false"` always
+- **Iteration 2:** Fixed `aria-invalid` to read from error state dynamically.
+  Also caught that the success state "Send Another" button wasn't resetting
+  the form values — fixed by resetting all useState values on click
+
+---
+
+### Before / After
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Field labels | None | ✅ Every field |
+| Placeholder disappears on focus | Yes | Label stays — placeholder is hint only |
+| Screen reader usable | No | ✅ Fully usable |
+| Inline validation errors | None | ✅ Per field with auto-focus |
+| WCAG AA compliant | ❌ Fails 3 criteria | ✅ Passes all 3 |
+| Loading feedback | None | ✅ "Sending..." state |
+| Success confirmation | None | ✅ Full confirmation message |
+
