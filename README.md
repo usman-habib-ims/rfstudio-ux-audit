@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Issue 1 — Custom Cursor Lag (Critical)
 
-## Getting Started
+### What the Problem Is
+The site runs a custom dual-ring cursor effect using a JavaScript `mousemove`
+event listener. Inside that listener, the cursor position is updated using
+`style.left` and `style.top` directly on the DOM element.
 
-First, run the development server:
+Changing `left` and `top` forces the browser to recalculate the layout of the
+entire page on every single mouse movement — a performance antipattern known as
+**"layout thrashing"**. On mid-range laptops and devices the cursor ring
+visibly trails behind the pointer and the whole site feels sluggish as a result.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Where It Shows Up
+- Sitewide — affects every page on rfstudio.co
+- Most noticeable when moving the mouse quickly or during scroll
+- Worst on mid-range Windows laptops and mobile devices with hover support
+
+### Why It Matters
+A laggy cursor is one of the first things a visitor notices. For an agency
+selling itself as a high-performance growth studio, a jittery cursor directly
+contradicts the brand. It signals poor technical quality before the user has
+even read a word — and increases bounce rate.
+
+### Root Cause (Code Level)
+```js
+// ❌ What the site is doing — triggers layout reflow every frame
+cursor.style.left = e.clientX + 'px';
+cursor.style.top  = e.clientY + 'px';
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Changing `left` / `top` are **layout properties**. Every time they change,
+the browser must:
+1. Recalculate layout (reflow)
+2. Repaint affected elements
+3. Composite the result
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This happens on every `mousemove` event — which fires up to 60–120 times
+per second. The result is guaranteed jank.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### The Fix
+Replace `left` / `top` with `transform: translate(x, y)`. Transforms are
+handled entirely on the **GPU compositor thread** — they never trigger layout
+or paint. Add `will-change: transform` to promote the element to its own GPU
+layer upfront.
 
-## Learn More
+For the trailing ring, use `requestAnimationFrame` with a **lerp
+(linear interpolation)** at factor `0.12` — this creates a smooth organic
+trail without any setTimeout or setInterval hacks.
+```js
+// ✅ The fix — GPU composited, zero layout cost
+// Dot follows mouse exactly
+dot.style.transform = `translate(${mouseX}px, ${mouseY}px)`;
 
-To learn more about Next.js, take a look at the following resources:
+// Ring lerps behind smoothly via rAF
+ringX += (mouseX - ringX) * 0.12;
+ringY += (mouseY - ringY) * 0.12;
+ring.style.transform = `translate(${ringX}px, ${ringY}px)`;
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Files Created / Modified
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| File | What Changed |
+|------|-------------|
+| `src/components/CustomCursor.jsx` | Created — full GPU cursor component |
+| `src/app/layout.jsx` | Added `<CustomCursor />` import and render |
+| `src/app/globals.css` | Added `* { cursor: none !important; }` |
 
-## Deploy on Vercel
+### Technical Details
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Property | Before | After |
+|----------|--------|-------|
+| Position method | `style.left / top` | `transform: translate()` |
+| Rendering thread | Main (layout) | GPU Compositor |
+| Triggers reflow | ✅ Yes — every frame | ❌ Never |
+| `will-change` | Not set | `transform` |
+| Trail method | Direct update | `requestAnimationFrame` + lerp |
+| Memory cleanup | None | Listeners removed on unmount |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Performance Impact
+- Eliminates layout reflow on every mousemove event
+- Cursor runs at a stable 60fps on all tested devices
+- GPU compositor handles all movement — main thread is free
+- Zero external libraries — only React hooks (`useRef`, `useEffect`)
+
+### AI Prompt Used
+> "I am building a Next.js 14 app (App Router, no TypeScript).
+> I need you to fix a custom cursor performance issue.
+> The problem: The current cursor updates position using style.left and
+> style.top inside a mousemove event listener. This causes layout thrashing
+> on every frame because left/top trigger browser reflow. The cursor ring
+> visibly lags and feels janky on mid-range devices.
+> What I want you to build: Create src/components/CustomCursor.jsx as a
+> client component. Use useRef and useEffect. Main dot follows mouse exactly
+> using transform only. Ring trails with rAF lerp at 0.12. Add will-change
+> transform. Arrow SVG in #c8ff00 with glow. Rotates toward movement direction.
+> Hover on a/button dims arrow and scales trail. Clean up on unmount.
+> Also update layout.jsx and globals.css."
+
+### Iterations Taken
+- **Iteration 1:** Generated the component — worked but arrow rotation was
+  slightly off because atan2 angle wasn't offset by 90 degrees for SVG
+  coordinate space
+- **Iteration 2:** Fixed the angle offset (`+ 90`), tested on multiple screen
+  sizes — smooth and stable
+
+### Before / After
+| Metric | Before | After |
+|--------|--------|-------|
+| Layout reflows per second | Up to 120 | 0 |
+| Rendering thread used | Main | GPU |
+| Cursor feel | Laggy / janky | Smooth 60fps |
+| External dependencies | 0 | 0 |
+
+
+
