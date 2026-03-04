@@ -8,13 +8,15 @@ const CustomCursor = () => {
   const requestRef = useRef();
 
   const mousePos = useRef({ x: 0, y: 0 });
-  const currentPos = useRef({ x: 0, y: 0 });
   const trailPos = useRef({ x: 0, y: 0 });
   const angle = useRef(0);
-  const lastAngle = useRef(0);
   const isHovering = useRef(false);
 
   useEffect(() => {
+    // Check if device supports hover/touch
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) return;
+
     const onMouseMove = (e) => {
       mousePos.current = { x: e.clientX, y: e.clientY };
     };
@@ -25,23 +27,6 @@ const CustomCursor = () => {
       }
     };
 
-    const animate = () => {
-      // Direct update for main cursor (zero lag)
-      currentPos.current.x = mousePos.current.x;
-      currentPos.current.y = mousePos.current.y;
-
-      // Lerp for trailing ring (smooth lag)
-      const lerpFactor = 0.12;
-      trailPos.current.x += (mousePos.current.x - trailPos.current.x) * lerpFactor;
-      trailPos.current.y += (mousePos.current.y - trailPos.current.y) * lerpFactor;
-
-      // Calculate rotation based on movement
-      const dx = mousePos.current.x - currentPos.current.x; // this doesn't work if they are same
-      // Need previous mouse pos for rotation?
-      // Actually, use current vs mousePos from last frame.
-    };
-    
-    // Better rotation logic:
     let prevX = 0;
     let prevY = 0;
 
@@ -50,26 +35,21 @@ const CustomCursor = () => {
       const dy = mousePos.current.y - prevY;
 
       if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-        lastAngle.current = Math.atan2(dy, dx) * (180 / Math.PI);
+        angle.current = Math.atan2(dy, dx) * (180 / Math.PI);
       }
 
-      // Smoothly interpolate angle? Not asked, but could be nice. 
-      // User just said "rotate to point in the direction".
-      angle.current = lastAngle.current;
-
-      // Update positions
-      const lerpFactor = 0.12;
+      // Smooth interpolation for trail
+      const lerpFactor = 0.15;
       trailPos.current.x += (mousePos.current.x - trailPos.current.x) * lerpFactor;
       trailPos.current.y += (mousePos.current.y - trailPos.current.y) * lerpFactor;
 
       if (cursorRef.current) {
-        const opacity = isHovering.current ? 0.5 : 1;
         cursorRef.current.style.transform = `translate(${mousePos.current.x}px, ${mousePos.current.y}px) rotate(${angle.current}deg)`;
-        cursorRef.current.style.opacity = opacity;
+        cursorRef.current.style.opacity = isHovering.current ? 0.5 : 1;
       }
 
       if (trailRef.current) {
-        const scale = isHovering.current ? 1.8 : 1;
+        const scale = isHovering.current ? 1.6 : 1;
         trailRef.current.style.transform = `translate(${trailPos.current.x}px, ${trailPos.current.y}px) scale(${scale})`;
       }
 
@@ -79,8 +59,8 @@ const CustomCursor = () => {
       requestRef.current = requestAnimationFrame(update);
     };
 
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseover", onMouseOver);
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    window.addEventListener("mouseover", onMouseOver, { passive: true });
     requestRef.current = requestAnimationFrame(update);
 
     return () => {
@@ -101,27 +81,19 @@ const CustomCursor = () => {
           width: "24px",
           height: "24px",
           pointerEvents: "none",
-          zIndex: 9999,
+          zIndex: 999999, // Extremely high to stay above drawer
           willChange: "transform",
           marginLeft: "-12px",
           marginTop: "-12px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          filter: "drop-shadow(0 0 6px #c8ff00aa)",
+          filter: "drop-shadow(0 0 8px rgba(200, 255, 0, 0.6))",
+          transition: "opacity 0.2s ease",
         }}
       >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M2 2L22 12L2 22L6 12L2 2Z"
-            fill="#c8ff00"
-          />
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M2 2L22 12L2 22L6 12L2 2Z" fill="#c8ff00" />
         </svg>
       </div>
       <div
@@ -130,16 +102,16 @@ const CustomCursor = () => {
           position: "fixed",
           top: 0,
           left: 0,
-          width: "40px",
-          height: "40px",
-          border: "2px solid #c8ff00",
+          width: "44px",
+          height: "44px",
+          border: "2px solid rgba(200, 255, 0, 0.5)",
           borderRadius: "50%",
           pointerEvents: "none",
-          zIndex: 9998,
+          zIndex: 999998,
           willChange: "transform",
-          marginLeft: "-20px",
-          marginTop: "-20px",
-          transition: "opacity 0.2s ease", 
+          marginLeft: "-22px",
+          marginTop: "-22px",
+          transition: "transform 0.15s ease-out", 
         }}
       />
     </>
